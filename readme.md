@@ -20,6 +20,11 @@ SC_ADDRESS # Address for the HTTP server. (Default: :8080)
 go run cmd/main.go
 ```
 
+Server is accessible on
+http://localhost:8080/request
+
+When hitting the page, the hit counter is increased and the current count is displayed.
+
 ### Extensions
 
 The application can, of course, be extended and adapted to different requirements.

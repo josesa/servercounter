@@ -16,11 +16,14 @@ type HitCounter struct {
 	store storage.Storage
 }
 
+// New creates a HitCounter service
 func New(c counter.Counter, storage storage.Storage) (*HitCounter, error) {
 
 	data, err := readFromStorage(storage)
 	if err != nil {
-		return nil, err
+		// Is not possible to load the data from storage, in this case, proceed with empty data instead of failing.
+		// Alternative, the service could abort if that information is considered critical
+		data = make(map[int64]uint64)
 	}
 
 	if len(data) > 0 {
