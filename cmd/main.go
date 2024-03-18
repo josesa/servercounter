@@ -13,14 +13,8 @@ import (
 	"github.com/josesa/servercounter/internal/counter"
 	"github.com/josesa/servercounter/internal/server"
 	"github.com/josesa/servercounter/internal/service"
+	"github.com/josesa/servercounter/internal/storage"
 )
-
-type fakeTime struct{}
-
-func (ft fakeTime) Now() time.Time {
-	fake := time.Date(1974, time.May, 19, 1, 2, 3, 4, time.UTC)
-	return fake
-}
 
 func main() {
 	// Initializing counter
@@ -31,7 +25,8 @@ func main() {
 	)
 
 	// Creating HitCounter Service
-	counterService, err := service.New(c, "data.txt")
+	storage := storage.NewFileStorage("data.txt")
+	counterService, err := service.New(c, storage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,7 +59,7 @@ func main() {
 	}
 
 	// HTTP server has been stopped, ensure service is correctly terminated
-	err = counterService.Shutdown()
+	err = counterService.Flush()
 	if err != nil {
 		log.Fatal(err)
 	}

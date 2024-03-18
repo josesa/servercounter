@@ -1,101 +1,80 @@
 package service
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/josesa/servercounter/internal/counter"
+	"github.com/josesa/servercounter/internal/storage"
 )
 
 // HitCounter provides a persistance hit counter service
 type HitCounter struct {
 	counter counter.Counter
 
-	dataStoragePath string
+	store storage.Storage
 }
 
-func New(c counter.Counter, path string) (*HitCounter, error) {
-	// If a dataStoragePath is supplied, then it is used to load the initial values to the counter
-	if len(path) > 0 {
-		data, err := readFromFile(path)
-		if err != nil {
-			return nil, err
-		}
+func New(c counter.Counter, storage storage.Storage) (*HitCounter, error) {
 
-		if len(data) > 0 {
-			c.Load(data)
-		}
+	data, err := readFromStorage(storage)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) > 0 {
+		c.Load(data)
 	}
 
 	wc := &HitCounter{
-		counter:         c,
-		dataStoragePath: path,
+		counter: c,
+		store:   storage,
 	}
 
 	return wc, nil
 }
 
-// Shutdown should be called when terminating the service if the counter values should be persisted
-func (hc *HitCounter) Shutdown() error {
-	// On shutdown, save the current counter values into permanent storage
-
-	if len(hc.dataStoragePath) > 0 {
-		data := hc.counter.Dump()
-		saveToFile(data, hc.dataStoragePath)
-	}
-
-	return nil
+// Flush should be called when terminating the service if the counter values should be persisted
+func (hc *HitCounter) Flush() error {
+	data := hc.counter.Dump()
+	return saveToStorage(data, hc.store)
 }
 
 // IncAndGetCount increases the counter value and returns current count
 func (hc *HitCounter) IncAndGetCount() uint64 {
 	hc.counter.Inc()
+
 	return hc.counter.GetCount()
 }
 
-// loadFromFile tries to read counter information from a text file
-func readFromFile(path string) (map[int64]uint64, error) {
+func readFromStorage(s storage.Storage) (map[int64]uint64, error) {
 	data := make(map[int64]uint64)
-
-	file, err := os.Open(path)
+	content, err := s.Read()
 	if err != nil {
 		return data, err
 	}
-	defer file.Close()
 
-	buffer := bufio.NewScanner(file)
-	buffer.Split(bufio.ScanLines)
-	for buffer.Scan() {
-		parts := strings.Split(buffer.Text(), ":")
+	lines := strings.Split(content, "\n")
+	for _, l := range lines {
+		parts := strings.Split(l, ":")
 		if len(parts) == 2 {
 			k, errk := strconv.ParseInt(parts[0], 10, 64)
 			v, errv := strconv.ParseUint(parts[1], 10, 64)
 			if errk == nil && errv == nil {
 				data[k] = v
 			}
-
 		}
 	}
 
 	return data, nil
 }
 
-// saveToFile extracts current counter values and dumps them into the text file
-func saveToFile(data map[int64]uint64, path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	buffer := bufio.NewWriter(file)
+func saveToStorage(data map[int64]uint64, s storage.Storage) error {
+	var sb strings.Builder
 	for k, v := range data {
-		fmt.Fprintf(buffer, "%d:%d\n", k, v)
+		sb.WriteString(fmt.Sprintf("%d:%d\n", k, v))
 	}
-	buffer.Flush()
 
-	return nil
+	return s.Write(sb.String())
 }
