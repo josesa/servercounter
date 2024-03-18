@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/josesa/servercounter/internal/config"
 	"github.com/josesa/servercounter/internal/counter"
 	"github.com/josesa/servercounter/internal/server"
 	"github.com/josesa/servercounter/internal/service"
@@ -17,16 +18,18 @@ import (
 )
 
 func main() {
+	// Load configuration object
+	config := config.NewFromEnv()
+
 	// Initializing counter
-	c := counter.New(
-		counter.WithWindowSize(10),
-		counter.WithFlushInterval(12*time.Second),
-		// counter.WithTime(fakeTime{}),
+	ct := counter.New(
+		counter.WithWindowSize(config.CounterWindowSeconds),
+		counter.WithFlushInterval(time.Duration(config.CounterFlushIntervalSeconds)*time.Second),
 	)
 
 	// Creating HitCounter Service
-	storage := storage.NewFileStorage("data.txt")
-	counterService, err := service.New(c, storage)
+	storage := storage.NewFileStorage(config.StoragePath)
+	counterService, err := service.New(ct, storage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +40,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /request", ws.Request)
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    config.ServerAddress,
 		Handler: mux,
 	}
 
